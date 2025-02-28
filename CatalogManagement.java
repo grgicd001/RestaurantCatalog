@@ -1,11 +1,10 @@
-
 import java.io.*;
 import java.util.*;
 
 public class CatalogManagement {
 
-    private static final String FILE_NAME = "catalog.csv";
-    private static List<Item> catalog = new ArrayList<>();
+    private static final String FILE_NAME = "restaurants.csv";
+    private static List<Restaurant> catalog = new ArrayList<>();
 
     public static void main(String[] args) {
         loadCatalog();
@@ -19,21 +18,25 @@ public class CatalogManagement {
         boolean running = true;
 
         while (running) {
-            System.out.println("\nCatalog Management System");
-            System.out.println("1. View Items");
-            System.out.println("2. Add Item");
-            System.out.println("3. Edit Item");
-            System.out.println("4. Save and Exit");
+            System.out.println("\nRestaurant Catalog Management System");
+            System.out.println("1. View Restaurants");
+            System.out.println("2. Add Restaurant");
+            System.out.println("3. Edit Restaurant");
+            System.out.println("4. Delete Restaurant");
+            System.out.println("5. Search and Filter Restaurants");
+            System.out.println("6. Save and Exit");
             System.out.print("Choose an option: ");
 
             int choice = scanner.nextInt();
-            scanner.nextLine(); // Consume newline
+            scanner.nextLine();
 
             switch (choice) {
-                case 1 -> viewItems();
-                case 2 -> addItem(scanner);
-                case 3 -> editItem(scanner);
-                case 4 -> {
+                case 1 -> viewRestaurants();
+                case 2 -> addRestaurant(scanner);
+                case 3 -> editRestaurant(scanner);
+                case 4 -> deleteRestaurant(scanner);
+                case 5 -> searchAndFilter(scanner);
+                case 6 -> {
                     saveCatalog();
                     running = false;
                 }
@@ -48,7 +51,6 @@ public class CatalogManagement {
 
         System.out.print("Enter username: ");
         String username = scanner.nextLine();
-
         System.out.print("Enter password: ");
         String password = scanner.nextLine();
 
@@ -66,13 +68,12 @@ public class CatalogManagement {
             }
             return;
         }
-
         try (BufferedReader br = new BufferedReader(new FileReader(FILE_NAME))) {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] parts = line.split(",");
-                if (parts.length == 3) { 
-                    catalog.add(new Item(parts[0].trim(), parts[1].trim(), parts[2].trim()));
+                if (parts.length == 4) {
+                    catalog.add(new Restaurant(parts[0].trim(), parts[1].trim(), parts[2].trim(), parts[3].trim()));
                 } else {
                     System.out.println("Skipping invalid line: " + line);
                 }
@@ -82,95 +83,88 @@ public class CatalogManagement {
         }
     }
 
-    private static void viewItems() {
+    private static void viewRestaurants() {
         if (catalog.isEmpty()) {
-            System.out.println("No items in the catalog.");
+            System.out.println("No restaurants in the catalog.");
             return;
         }
-
-        System.out.println("\nCatalog Items:");
+        System.out.println("\nRestaurant List:");
         for (int i = 0; i < catalog.size(); i++) {
             System.out.println((i + 1) + ". " + catalog.get(i));
         }
     }
 
-    private static void addItem(Scanner scanner) {
-        System.out.print("Enter item ID: ");
+    private static void addRestaurant(Scanner scanner) {
+        System.out.print("Enter restaurant ID: ");
         String id = scanner.nextLine().trim();
 
-        if (catalog.stream().anyMatch(item -> item.id.equals(id))) {
-            System.out.println("An item with this ID already exists. Please use a unique ID.");
+        if (catalog.stream().anyMatch(r -> r.id.equals(id))) {
+            System.out.println("A restaurant with this ID already exists.");
             return;
         }
 
-        System.out.print("Enter item name: ");
+        System.out.print("Enter restaurant name: ");
         String name = scanner.nextLine().trim();
+        System.out.print("Enter restaurant location: ");
+        String location = scanner.nextLine().trim();
+        System.out.print("Enter restaurant cuisine type: ");
+        String cuisine = scanner.nextLine().trim();
 
-        System.out.print("Enter item description: ");
-        String description = scanner.nextLine().trim();
-
-        if (id.trim().isEmpty() || name.trim().isEmpty() || description.trim().isEmpty()) {
-            System.out.println("ERROR: All fields are required.");
-            return;
-        }
-
-        catalog.add(new Item(id, name, description));
-        System.out.println("Item added successfully.");
+        catalog.add(new Restaurant(id, name, location, cuisine));
+        System.out.println("Restaurant added successfully.");
     }
 
-    private static void editItem(Scanner scanner) {
-        if (catalog.isEmpty()) {
-            System.out.println("The catalog is empty. Nothing to edit.");
-            return;
-        }
-
-        viewItems();
-
-        System.out.print("Enter the number of the item to edit: ");
-        int index;
-        try {
-            index = scanner.nextInt() - 1;
-        } catch (InputMismatchException e) {
-            System.out.println("Invalid input. Please enter a valid number.");
-            scanner.nextLine(); 
-            return;
-        }
-        scanner.nextLine(); 
+    private static void editRestaurant(Scanner scanner) {
+        viewRestaurants();
+        System.out.print("Enter the number of the restaurant to edit: ");
+        int index = scanner.nextInt() - 1;
+        scanner.nextLine();
 
         if (index < 0 || index >= catalog.size()) {
-            System.out.println("Invalid item number.");
+            System.out.println("Invalid restaurant number.");
             return;
         }
 
-        Item item = catalog.get(index);
-
-        System.out.print("Enter new name (current: " + item.getName() + "): ");
+        Restaurant restaurant = catalog.get(index);
+        System.out.print("Enter new name (current: " + restaurant.name + "): ");
         String name = scanner.nextLine().trim();
+        System.out.print("Enter new location (current: " + restaurant.location + "): ");
+        String location = scanner.nextLine().trim();
+        System.out.print("Enter new cuisine (current: " + restaurant.cuisine + "): ");
+        String cuisine = scanner.nextLine().trim();
 
-        System.out.print("Enter new description (current: " + item.getDescription() + "): ");
-        String description = scanner.nextLine().trim();
+        if (!name.isEmpty()) restaurant.name = name;
+        if (!location.isEmpty()) restaurant.location = location;
+        if (!cuisine.isEmpty()) restaurant.cuisine = cuisine;
 
-       
-        if (name.isEmpty() && description.isEmpty()) {
-            System.out.println("Error: At least one field (Name or Description) must be updated.");
+        System.out.println("Restaurant updated successfully.");
+    }
+
+    private static void deleteRestaurant(Scanner scanner) {
+        viewRestaurants();
+        System.out.print("Enter the number of the restaurant to delete: ");
+        int index = scanner.nextInt() - 1;
+        scanner.nextLine();
+
+        if (index < 0 || index >= catalog.size()) {
+            System.out.println("Invalid restaurant number.");
             return;
         }
+        catalog.remove(index);
+        System.out.println("Restaurant deleted successfully.");
+    }
 
-       
-        if (!name.isEmpty()) {
-            item.setName(name);
-        }
-        if (!description.isEmpty()) {
-            item.setDescription(description);
-        }
-
-        System.out.println("Item updated successfully.");
+    private static void searchAndFilter(Scanner scanner) {
+        System.out.print("Enter a keyword to search (name/location/cuisine): ");
+        String keyword = scanner.nextLine().trim().toLowerCase();
+        catalog.stream().filter(r -> r.name.toLowerCase().contains(keyword) || r.location.toLowerCase().contains(keyword) || r.cuisine.toLowerCase().contains(keyword))
+                .forEach(System.out::println);
     }
 
     private static void saveCatalog() {
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(FILE_NAME))) {
-            for (Item item : catalog) {
-                bw.write(item.toCSV());
+            for (Restaurant restaurant : catalog) {
+                bw.write(restaurant.toCSV());
                 bw.newLine();
             }
             System.out.println("Catalog saved successfully.");
@@ -179,40 +173,12 @@ public class CatalogManagement {
         }
     }
 
-    static class Item {
-        private String id;
-        private String name;
-        private String description;
-
-        public Item(String id, String name, String description) {
-            this.id = id;
-            this.name = name;
-            this.description = description;
+    static class Restaurant {
+        String id, name, location, cuisine;
+        public Restaurant(String id, String name, String location, String cuisine) {
+            this.id = id; this.name = name; this.location = location; this.cuisine = cuisine;
         }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public String getDescription() {
-            return description;
-        }
-
-        public void setDescription(String description) {
-            this.description = description;
-        }
-
-        public String toCSV() {
-            return id + "," + name + "," + description;
-        }
-
-        @Override
-        public String toString() {
-            return "ID: " + id + ", Name: " + name + ", Description: " + description;
-        }
+        public String toCSV() { return id + "," + name + "," + location + "," + cuisine; }
+        @Override public String toString() { return "ID: " + id + ", Name: " + name + ", Location: " + location + ", Cuisine: " + cuisine; }
     }
 }
