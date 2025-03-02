@@ -24,7 +24,8 @@ public class CatalogManagement {
             System.out.println("3. Edit Restaurant");
             System.out.println("4. Delete Restaurant");
             System.out.println("5. Search and Filter Restaurants");
-            System.out.println("6. Save and Exit");
+            System.out.println("6. Find Restaurant's Location");
+            System.out.println("7. Save and Exit");
             System.out.print("Choose an option: ");
 
             int choice = scanner.nextInt();
@@ -36,7 +37,8 @@ public class CatalogManagement {
                 case 3 -> editRestaurant(scanner);
                 case 4 -> deleteRestaurant(scanner);
                 case 5 -> searchAndFilter(scanner);
-                case 6 -> {
+                case 6 -> findRestaurantLocation(scanner);
+                case 7 -> {
                     saveCatalog();
                     running = false;
                 }
@@ -159,6 +161,27 @@ public class CatalogManagement {
         String keyword = scanner.nextLine().trim().toLowerCase();
         catalog.stream().filter(r -> r.name.toLowerCase().contains(keyword) || r.location.toLowerCase().contains(keyword) || r.cuisine.toLowerCase().contains(keyword))
                 .forEach(System.out::println);
+    }
+
+    private static void findRestaurantLocation(Scanner scanner) {
+        System.out.print("Enter your city: ");
+        String city = scanner.nextLine().trim().toLowerCase();
+        
+        List<Restaurant> results = new ArrayList<>();
+        for (Restaurant restaurant : catalog) {
+            if (restaurant.location.toLowerCase().contains(city)) {
+                results.add(restaurant);
+            }
+        }
+        
+        if (results.isEmpty()) {
+            System.out.println("No restaurants found in your area.");
+        } else {
+            System.out.println("Closest restaurant(s):");
+            for (Restaurant r : results) {
+                System.out.println(r.name + " - " + r.location);
+            }
+        }
     }
 
     private static void saveCatalog() {
