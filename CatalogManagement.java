@@ -23,8 +23,9 @@ public class CatalogManagement {
             System.out.println("2. Add Restaurant");
             System.out.println("3. Edit Restaurant");
             System.out.println("4. Delete Restaurant");
-            System.out.println("5. Search and Filter Restaurants");
-            System.out.println("6. Save and Exit");
+            System.out.println("5. Search Restaurants by Name");
+            System.out.println("6. Filter Restaurants by Location or Cuisine");
+            System.out.println("7. Save and Exit");
             System.out.print("Choose an option: ");
 
             int choice = scanner.nextInt();
@@ -35,8 +36,9 @@ public class CatalogManagement {
                 case 2 -> addRestaurant(scanner);
                 case 3 -> editRestaurant(scanner);
                 case 4 -> deleteRestaurant(scanner);
-                case 5 -> searchAndFilter(scanner);
-                case 6 -> {
+                case 5 -> search(scanner);
+                case 6 -> filter(scanner);
+                case 7 -> {
                     saveCatalog();
                     running = false;
                 }
@@ -154,12 +156,69 @@ public class CatalogManagement {
         System.out.println("Restaurant deleted successfully.");
     }
 
-    private static void searchAndFilter(Scanner scanner) {
-        System.out.print("Enter a keyword to search (name/location/cuisine): ");
+    private static void search(Scanner scanner) {
+        System.out.print("Enter a keyword to search by restaurant name: ");
         String keyword = scanner.nextLine().trim().toLowerCase();
-        catalog.stream().filter(r -> r.name.toLowerCase().contains(keyword) || r.location.toLowerCase().contains(keyword) || r.cuisine.toLowerCase().contains(keyword))
-                .forEach(System.out::println);
+
+        List<Restaurant> results = catalog.stream()
+                .filter(r -> r.name.toLowerCase().contains(keyword))
+                .toList();
+
+        if (results.isEmpty()) {
+            System.out.println("No restaurants found matching the search term.");
+        } else {
+            results.forEach(System.out::println);
+        }
     }
+
+    private static void filter(Scanner scanner) {
+        System.out.println("Filter by:");
+        System.out.println("1. Location");
+        System.out.println("2. Cuisine");
+        System.out.print("Choose an option: ");
+        int choice = scanner.nextInt();
+        scanner.nextLine();
+
+        Set<String> options = new HashSet<>();
+        if (choice == 1) {
+            catalog.forEach(r -> options.add(r.location));
+            System.out.println("Available Locations: " + options);
+        } else if (choice == 2) {
+            catalog.forEach(r -> options.add(r.cuisine));
+            System.out.println("Available Cuisines: " + options);
+        } else {
+            System.out.println("Invalid choice.");
+            return;
+        }
+
+        System.out.print("Enter the tags to filter by (comma-separated): ");
+        String[] selectedTags = scanner.nextLine().trim().toLowerCase().split(",");
+        Set<String> selectedSet = new HashSet<>(Arrays.asList(selectedTags));
+
+        System.out.print("Filter inclusively (any tag) or exclusively (all tags)? (I/E): ");
+        String mode = scanner.nextLine().trim().toUpperCase();
+
+        List<Restaurant> filtered;
+        if (mode.equals("I")) {
+            filtered = catalog.stream()
+                    .filter(r -> (choice == 1 ? selectedSet.contains(r.location.toLowerCase()) : selectedSet.contains(r.cuisine.toLowerCase())))
+                    .toList();
+        } else if (mode.equals("E")) {
+            filtered = catalog.stream()
+                    .filter(r -> (choice == 1 ? selectedSet.containsAll(Set.of(r.location.toLowerCase())) : selectedSet.containsAll(Set.of(r.cuisine.toLowerCase()))))
+                    .toList();
+        } else {
+            System.out.println("Invalid filter mode.");
+            return;
+        }
+
+        if (filtered.isEmpty()) {
+            System.out.println("No restaurants match the selected filters.");
+        } else {
+            filtered.forEach(System.out::println);
+        }
+    }
+
 
     private static void saveCatalog() {
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(FILE_NAME))) {
