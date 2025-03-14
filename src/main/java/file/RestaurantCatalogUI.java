@@ -4,23 +4,17 @@ import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -81,14 +75,66 @@ public class RestaurantCatalogUI extends Application {
 
         Button searchButton = new Button("Search");
         searchButton.setStyle("-fx-background-color: #28A745; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 8 16;");
-
         searchButton.setOnAction(e -> {
             String query = searchField.getText().toLowerCase();
             filterRestaurants(query);
         });
 
-        topNav.getChildren().addAll(logo, searchField, searchButton);
+        Button addButton = new Button("Add Restaurant");
+        addButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 8 16;");
+        addButton.setOnAction(e -> {
+            openAddRestaurantDialog();
+        });
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        topNav.getChildren().addAll(logo, searchField, searchButton, spacer, addButton);
+
         return topNav;
+    }
+
+    private void openAddRestaurantDialog() {
+        Stage dialog = new Stage();
+        dialog.setTitle("Add New Restaurant");
+
+        TextField nameField = new TextField();
+        nameField.setPromptText("Restaurant Name");
+        TextField cuisineField = new TextField();
+        cuisineField.setPromptText("Cuisine Type");
+        TextField imageUrlField = new TextField();
+        imageUrlField.setPromptText("Image URL");
+        TextField ratingField = new TextField();
+        ratingField.setPromptText("Rating (1-5)");
+
+        Button submitButton = new Button("Add Restaurant");
+        submitButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 8 16;");
+        submitButton.setOnAction(e -> {
+            String name = nameField.getText();
+            String cuisine = cuisineField.getText();
+            String imageUrl = imageUrlField.getText();
+            double rating;
+
+            try {
+                rating = Double.parseDouble(ratingField.getText());
+                if (rating < 1 || rating > 5) {
+                    throw new NumberFormatException("Invalid rating range");
+                }
+            } catch (NumberFormatException ex) {
+                Alert alert = new Alert(Alert.AlertType.ERROR, "Please enter a valid rating between 1 and 5.");
+                alert.show();
+                return;
+            }
+
+
+            addRestaurant(name, cuisine, imageUrl, rating);
+            dialog.close();
+        });
+
+        VBox dialogVbox = new VBox(10, nameField, cuisineField, imageUrlField, ratingField, submitButton);
+        dialogVbox.setPadding(new Insets(20));
+        dialogVbox.setStyle("-fx-background-color: #FFFFFF; -fx-background-radius: 10;");
+        dialog.setScene(new Scene(dialogVbox, 400, 300));
+        dialog.show();
     }
 
     private VBox createCategorySidebar() {
@@ -166,7 +212,7 @@ public class RestaurantCatalogUI extends Application {
         gridPane.setHgap(25);
         gridPane.setVgap(25);
 
-        allRestaurants = getRestaurants();
+        allRestaurants = getRestaurants("restaurants.csv");
         displayAllRestaurants();
 
         scrollPane.setContent(gridPane);
@@ -294,32 +340,143 @@ public class RestaurantCatalogUI extends Application {
         detailsButton.setStyle("-fx-background-color: transparent; -fx-text-fill: #6C757D; -fx-border-color: #6C757D; -fx-border-radius: 5; -fx-padding: 8 16;");
 
         detailsButton.setOnAction(e -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            Alert alert = new Alert(Alert.AlertType.NONE);  // NONE means no default buttons.
             alert.setTitle("Restaurant Details");
             alert.setHeaderText(restaurant.name);
             alert.setContentText("Cuisine: " + restaurant.cuisine + "\nRating: " + restaurant.rating + "/5.0" +
                     "\n\nThis restaurant offers delicious " + restaurant.cuisine.toLowerCase() +
                     " cuisine with exceptional service and ambiance.");
-            alert.showAndWait();
+
+            ButtonType okButtonType = new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
+            ButtonType updateButtonType = new ButtonType("Update Details");
+
+            alert.getButtonTypes().setAll(okButtonType, updateButtonType);
+
+            alert.showAndWait().ifPresent(response -> {
+                if (response == updateButtonType) {
+                    openUpdateRestaurantDialog(restaurant);  // Open the Update Details dialog
+                }
+            });
         });
 
-        buttonBox.getChildren().addAll(orderButton, detailsButton);
+        Button deleteButton = new Button("Delete");
+        deleteButton.setStyle("-fx-background-color: #FF0000; -fx-text-fill: white; -fx-background-radius: 5; -fx-padding: 8 16;");
+        deleteButton.setOnAction(e -> {
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("Delete Restaurant");
+            alert.setHeaderText("Are you sure you want to delete " + restaurant.name + "?");
+            alert.setContentText("This action cannot be undone.");
+
+            alert.showAndWait().ifPresent(response -> {
+                if (response == ButtonType.OK) {
+                    deleteRestaurant(restaurant);
+                }
+            });
+        });
+
+        buttonBox.getChildren().addAll(orderButton, detailsButton, deleteButton);
+
         infoBox.getChildren().addAll(headerBox, cuisineRatingBox, buttonBox);
         card.getChildren().addAll(imageView, infoBox);
         return card;
     }
 
-    private List<Restaurant> getRestaurants() {
-        List<Restaurant> list = new ArrayList<>();
-        list.add(new Restaurant("Pizza Palace", "Italian", "https://via.placeholder.com/430x240.png?text=Pizza+Palace", 4.5));
-        list.add(new Restaurant("Burger Bonanza", "Fast Food", "https://via.placeholder.com/430x240.png?text=Burger+Bonanza", 4.2));
-        list.add(new Restaurant("Sushi Central", "Japanese", "https://via.placeholder.com/430x240.png?text=Sushi+Central", 4.8));
-        list.add(new Restaurant("Noodle Nook", "Chinese", "https://via.placeholder.com/430x240.png?text=Noodle+Nook", 4.3));
-        list.add(new Restaurant("Taco Town", "Mexican", "https://via.placeholder.com/430x240.png?text=Taco+Town", 4.0));
-        list.add(new Restaurant("Curry Corner", "Indian", "https://via.placeholder.com/430x240.png?text=Curry+Corner", 4.6));
-        list.add(new Restaurant("Bakery Bliss", "Dessert", "https://via.placeholder.com/430x240.png?text=Bakery+Bliss", 4.7));
-        list.add(new Restaurant("Salad Stop", "Healthy", "https://via.placeholder.com/430x240.png?text=Salad+Stop", 4.1));
-        return list;
+    private List<Restaurant> getRestaurants(String filePath) {
+        List<Restaurant> restaurants = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] data = line.split(",");
+                if (data.length == 4) {
+                    String name = data[0].trim();
+                    String cuisine = data[1].trim();
+                    String imageUrl = data[2].trim();
+                    double rating = Double.parseDouble(data[3].trim());
+
+                    restaurants.add(new Restaurant(name, cuisine, imageUrl, rating));
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return restaurants;
+    }
+
+    // DOESNT HANDLE SPECIAL CASES YET
+    private void addRestaurant(String name, String cuisine, String imageUrl, double rating) {
+        Restaurant newRestaurant = new Restaurant(name, cuisine, imageUrl, rating);
+        allRestaurants.add(newRestaurant);
+        displayAllRestaurants();
+        saveRestaurants();
+    }
+
+    private void deleteRestaurant(Restaurant restaurantToDelete) {
+        allRestaurants.remove(restaurantToDelete);
+        displayAllRestaurants();
+        saveRestaurants();
+    }
+
+    private void updateRestaurant(Restaurant oldRestaurant, String newName, String newCuisine, String newImageUrl, double newRating) {
+        oldRestaurant.name = newName;
+        oldRestaurant.cuisine = newCuisine;
+        oldRestaurant.imageUrl = newImageUrl;
+        oldRestaurant.rating = newRating;
+        displayAllRestaurants();
+        saveRestaurants();
+    }
+
+    private void openUpdateRestaurantDialog(Restaurant restaurant) {
+        Stage dialog = new Stage();
+        dialog.setTitle("Update Restaurant Details");
+
+        TextField nameField = new TextField(restaurant.name);
+        nameField.setPromptText("Restaurant Name");
+        TextField cuisineField = new TextField(restaurant.cuisine);
+        cuisineField.setPromptText("Cuisine Type");
+        TextField imageUrlField = new TextField(restaurant.imageUrl);
+        imageUrlField.setPromptText("Image URL");
+        TextField ratingField = new TextField(String.valueOf(restaurant.rating));
+        ratingField.setPromptText("Rating (1-5)");
+
+        Button submitButton = new Button("Update Restaurant");
+        submitButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 8 16;");
+        submitButton.setOnAction(e -> {
+            String name = nameField.getText();
+            String cuisine = cuisineField.getText();
+            String imageUrl = imageUrlField.getText();
+            double rating;
+
+            try {
+                rating = Double.parseDouble(ratingField.getText());
+                if (rating < 1 || rating > 5) {
+                    throw new NumberFormatException("Invalid rating range");
+                }
+            } catch (NumberFormatException ex) {
+                Alert alert = new Alert(Alert.AlertType.ERROR, "Please enter a valid rating between 1 and 5.");
+                alert.show();
+                return;
+            }
+
+            updateRestaurant(restaurant, name, cuisine, imageUrl, rating);
+            dialog.close();
+        });
+
+        VBox dialogVbox = new VBox(10, nameField, cuisineField, imageUrlField, ratingField, submitButton);
+        dialogVbox.setPadding(new Insets(20));
+        dialogVbox.setStyle("-fx-background-color: #FFFFFF; -fx-background-radius: 10;");
+        dialog.setScene(new Scene(dialogVbox, 400, 300));
+        dialog.show();
+    }
+
+    private void saveRestaurants() {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter("restaurants.csv"))) {
+            for (Restaurant restaurant : allRestaurants) {
+                bw.write(restaurant.name + ", " + restaurant.cuisine + ", " + restaurant.imageUrl + ", " + restaurant.rating);
+                bw.newLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public static void main(String[] args) {
