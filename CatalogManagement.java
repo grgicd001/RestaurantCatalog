@@ -167,6 +167,52 @@ public class CatalogManagement {
         System.out.println("Item updated successfully.");
     }
 
+    private static void addImage(File img, String id, boolean cover) {
+        InputStream is = null;
+        OutputStream os = null;
+
+        //create directory if it doesn't exist
+        File resDir = new File("/RestaurantCatalog/images/"+id);
+        if (!resDir.exists()) {
+            resDir.mkdirs();
+        }
+
+        try {
+            String fileName;
+            if (cover) { //if the user wants the image to be the cover image, rename it to cover.
+                String ext = img.getName().substring(img.getName().lastIndexOf("."));
+                fileName = "cover."+ext;
+            } else {
+                fileName = img.getName();
+            }
+
+            File destFile = new File(resDir, fileName);
+
+            is = new FileInputStream(img);
+            os = new FileOutputStream(destFile);
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = is.read(buffer)) > 0) {
+                os.write(buffer, 0, length);
+            }
+        } catch (IOException e) {
+            System.err.println("Error copying image: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            try {
+                if (is != null) is.close();
+            } catch (IOException e) {
+                System.err.println("Error closing input stream: " + e.getMessage());
+            }
+
+            try {
+                if (os != null) os.close();
+            } catch (IOException e) {
+                System.err.println("Error closing output stream: " + e.getMessage());
+            }
+        }
+    }
+
     private static void saveCatalog() {
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(FILE_NAME))) {
             for (Item item : catalog) {
