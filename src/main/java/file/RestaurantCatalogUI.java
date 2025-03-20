@@ -12,7 +12,9 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.scene.shape.Rectangle;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -39,6 +41,11 @@ public class RestaurantCatalogUI extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+        File imagesDir = new File("/RestaurantCatalog/images/");
+        if (!imagesDir.exists()) {
+            imagesDir.mkdirs();
+        }
+
         primaryStage.setTitle("Restaurant Catalog");
         allRestaurants = getRestaurants("restaurants.csv");
 
@@ -199,17 +206,32 @@ public class RestaurantCatalogUI extends Application {
         nameField.setPromptText("Restaurant Name");
         TextField cuisineField = new TextField();
         cuisineField.setPromptText("Cuisine Type");
-        TextField imageUrlField = new TextField();
-        imageUrlField.setPromptText("Image URL");
         TextField ratingField = new TextField();
         ratingField.setPromptText("Rating (1-5)");
+
+        Button uploadImageButton = new Button("Upload Image");
+        uploadImageButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 8 16;");
+
+        Label imagePathLabel = new Label("No image selected");
+        File[] selectedImageFile = new File[1];
+
+        uploadImageButton.setOnAction(e -> {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Select Restaurant Image");
+            fileChooser.getExtensionFilters().addAll(
+                    new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif")
+            );
+            selectedImageFile[0] = fileChooser.showOpenDialog(dialog);
+            if (selectedImageFile[0] != null) {
+                imagePathLabel.setText(selectedImageFile[0].getAbsolutePath());
+            }
+        });
 
         Button submitButton = new Button("Add Restaurant");
         submitButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 8 16;");
         submitButton.setOnAction(e -> {
             String name = nameField.getText();
             String cuisine = cuisineField.getText();
-            String imageUrl = imageUrlField.getText();
             double rating;
 
             try {
@@ -223,12 +245,19 @@ public class RestaurantCatalogUI extends Application {
                 return;
             }
 
+            String imageUrl = "";
+            if (selectedImageFile[0] != null) {
+                String id = String.valueOf(System.currentTimeMillis());
+                addImage(selectedImageFile[0], id, true);
+                String ext = selectedImageFile[0].getName().substring(selectedImageFile[0].getName().lastIndexOf('.'));
+                imageUrl = "images/" + id + "/cover" + ext;
+            }
 
             addRestaurant(name, cuisine, imageUrl, rating);
             dialog.close();
         });
 
-        VBox dialogVbox = new VBox(10, nameField, cuisineField, imageUrlField, ratingField, submitButton);
+        VBox dialogVbox = new VBox(10, nameField, cuisineField, ratingField, uploadImageButton, imagePathLabel, submitButton);
         dialogVbox.setPadding(new Insets(20));
         dialogVbox.setStyle("-fx-background-color: #FFFFFF; -fx-background-radius: 10;");
         dialog.setScene(new Scene(dialogVbox, 400, 300));
@@ -369,27 +398,46 @@ public class RestaurantCatalogUI extends Application {
         }
     }
 
-
     public VBox createRestaurantCard(Restaurant restaurant) {
         VBox card = new VBox(12);
         card.setPadding(new Insets(0, 0, 15, 0));
         card.setStyle("-fx-background-color: #ffffff; -fx-background-radius: 12; -fx-border-radius: 12;");
-        card.setPrefWidth(430);
+        card.setPrefWidth(475);
         card.setEffect(new DropShadow(10, Color.rgb(0, 0, 0, 0.1)));
 
         ImageView imageView;
         try {
-            Image image = new Image(restaurant.imageUrl, 430, 240, false, true);
-            imageView = new ImageView(image);
-            imageView.setFitWidth(430);
-            imageView.setFitHeight(240);
-            imageView.setStyle("-fx-background-radius: 12 12 0 0;");
+            if (restaurant.imageUrl.startsWith("http")) {
+                Image image = new Image(restaurant.imageUrl, 475, 238, false, true);
+                imageView = new ImageView(image);
+            } else {
+                File imageFile = new File(restaurant.imageUrl);
+                System.out.println("Image file path: " + imageFile.getAbsolutePath());
+                System.out.println("Image file exists: " + imageFile.exists());
+
+                if (imageFile.exists()) {
+                    Image image = new Image(imageFile.toURI().toString(), 475, 238, false, true);
+                    imageView = new ImageView(image);
+                } else {
+                    throw new FileNotFoundException("Image file not found: " + imageFile.getAbsolutePath());
+                }
+            }
+            imageView.setFitWidth(475);
+            imageView.setFitHeight(238);
+            imageView.setStyle("-fx-background-radius: 12 12 0 0; -fx-border-radius: 12 12 0 0;");
         } catch (Exception e) {
+            System.err.println("Error loading image: " + e.getMessage());
+
             imageView = new ImageView();
-            imageView.setFitWidth(430);
-            imageView.setFitHeight(240);
-            imageView.setStyle("-fx-background-color: #E9ECEF;");
+            imageView.setFitWidth(475);
+            imageView.setFitHeight(238);
+            imageView.setStyle("-fx-background-color: #E9ECEF; -fx-background-radius: 12 12 0 0; -fx-border-radius: 12 12 0 0;");
         }
+
+        Rectangle clip = new Rectangle(475, 238);
+        clip.setArcWidth(24);
+        clip.setArcHeight(24);
+        imageView.setClip(clip);
 
         VBox infoBox = new VBox(8);
         infoBox.setPadding(new Insets(15, 20, 10, 20));
@@ -487,6 +535,51 @@ public class RestaurantCatalogUI extends Application {
         return card;
     }
 
+    private static void addImage(File img, String id, boolean cover) {
+        InputStream is = null;
+        OutputStream os = null;
+
+        File resDir = new File("images/" + id);
+        if (!resDir.exists()) {
+            resDir.mkdirs();
+        }
+
+        try {
+            String fileName;
+            if (cover) {
+                String ext = img.getName().substring(img.getName().lastIndexOf('.'));
+                fileName = "cover" + ext;
+            } else {
+                fileName = img.getName();
+            }
+
+            File destFile = new File(resDir, fileName);
+
+            is = new FileInputStream(img);
+            os = new FileOutputStream(destFile);
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = is.read(buffer)) > 0) {
+                os.write(buffer, 0, length);
+            }
+        } catch (IOException e) {
+            System.err.println("Error copying image: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            try {
+                if (is != null) is.close();
+            } catch (IOException e) {
+                System.err.println("Error closing input stream: " + e.getMessage());
+            }
+
+            try {
+                if (os != null) os.close();
+            } catch (IOException e) {
+                System.err.println("Error closing output stream: " + e.getMessage());
+            }
+        }
+    }
+
     public List<Restaurant> getRestaurants(String filePath) {
         List<Restaurant> restaurants = new ArrayList<>();
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
@@ -539,17 +632,32 @@ public class RestaurantCatalogUI extends Application {
         nameField.setPromptText("Restaurant Name");
         TextField cuisineField = new TextField(restaurant.cuisine);
         cuisineField.setPromptText("Cuisine Type");
-        TextField imageUrlField = new TextField(restaurant.imageUrl);
-        imageUrlField.setPromptText("Image URL");
         TextField ratingField = new TextField(String.valueOf(restaurant.rating));
         ratingField.setPromptText("Rating (1-5)");
+
+        Button uploadImageButton = new Button("Upload Image");
+        uploadImageButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 8 16;");
+
+        Label imagePathLabel = new Label(restaurant.imageUrl.isEmpty() ? "No image selected" : restaurant.imageUrl);
+        File[] selectedImageFile = new File[1];
+
+        uploadImageButton.setOnAction(e -> {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Select Restaurant Image");
+            fileChooser.getExtensionFilters().addAll(
+                    new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif")
+            );
+            selectedImageFile[0] = fileChooser.showOpenDialog(dialog);
+            if (selectedImageFile[0] != null) {
+                imagePathLabel.setText(selectedImageFile[0].getAbsolutePath());
+            }
+        });
 
         Button submitButton = new Button("Update Restaurant");
         submitButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 8 16;");
         submitButton.setOnAction(e -> {
             String name = nameField.getText();
             String cuisine = cuisineField.getText();
-            String imageUrl = imageUrlField.getText();
             double rating;
 
             try {
@@ -563,11 +671,19 @@ public class RestaurantCatalogUI extends Application {
                 return;
             }
 
+            String imageUrl = restaurant.imageUrl;
+            if (selectedImageFile[0] != null) {
+                String id = String.valueOf(System.currentTimeMillis());
+                addImage(selectedImageFile[0], id, true);
+                String ext = selectedImageFile[0].getName().substring(selectedImageFile[0].getName().lastIndexOf('.'));
+                imageUrl = "images/" + id + "/cover" + ext;
+            }
+
             updateRestaurant(restaurant, name, cuisine, imageUrl, rating);
             dialog.close();
         });
 
-        VBox dialogVbox = new VBox(10, nameField, cuisineField, imageUrlField, ratingField, submitButton);
+        VBox dialogVbox = new VBox(10, nameField, cuisineField, ratingField, uploadImageButton, imagePathLabel, submitButton);
         dialogVbox.setPadding(new Insets(20));
         dialogVbox.setStyle("-fx-background-color: #FFFFFF; -fx-background-radius: 10;");
         dialog.setScene(new Scene(dialogVbox, 400, 300));
