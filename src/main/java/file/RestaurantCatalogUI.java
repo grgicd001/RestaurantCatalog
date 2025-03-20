@@ -19,6 +19,7 @@ import javafx.scene.shape.Rectangle;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 public class RestaurantCatalogUI extends Application {
 
@@ -36,18 +37,149 @@ public class RestaurantCatalogUI extends Application {
         }
     }
 
+    private boolean isAdmin;
     public GridPane gridPane;
     public List<Restaurant> allRestaurants;
 
     @Override
     public void start(Stage primaryStage) {
+        List<User> users = User.loadUsers("users.csv");
+
+        Stage loginStage = new Stage();
+        loginStage.setTitle("Login");
+
+        GridPane grid = new GridPane();
+        grid.setPadding(new Insets(20));
+        grid.setVgap(10);
+        grid.setHgap(10);
+
+        Label userLabel = new Label("Username:");
+        TextField userField = new TextField();
+        Label passLabel = new Label("Password:");
+        PasswordField passField = new PasswordField();
+        Button loginButton = new Button("Login");
+        Button signUpButton = new Button("Sign Up");
+        Button guestButton = new Button("View as Guest");
+
+        grid.add(userLabel, 0, 0);
+        grid.add(userField, 1, 0);
+        grid.add(passLabel, 0, 1);
+        grid.add(passField, 1, 1);
+        grid.add(loginButton, 1, 2);
+        grid.add(signUpButton, 1, 3);
+        grid.add(guestButton, 1, 4);
+
+        loginButton.setOnAction(e -> {
+            String username = userField.getText();
+            String password = passField.getText();
+
+            boolean isValid = false;
+            for (User user : users) {
+                if (user.getUsername().equals(username) && user.getPassword().equals(password)) {
+                    isValid = true;
+                    isAdmin = user.isAdmin();
+                    break;
+                }
+            }
+
+            if (isValid) {
+                loginStage.close();
+                showMainUI(primaryStage);
+            } else {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Login Failed");
+                alert.setHeaderText("Invalid username or password");
+                alert.setContentText("Please try again.");
+                alert.show();
+            }
+        });
+
+        signUpButton.setOnAction(e -> {
+            TextInputDialog usernameDialog = new TextInputDialog();
+            usernameDialog.setTitle("Sign Up");
+            usernameDialog.setHeaderText("Create a new account");
+            usernameDialog.setContentText("Username:");
+
+            Optional<String> usernameResult = usernameDialog.showAndWait();
+            usernameResult.ifPresent(username -> {
+                Dialog<String> passwordDialog = new Dialog<>();
+                passwordDialog.setTitle("Sign Up");
+                passwordDialog.setHeaderText("Create a new account");
+
+                PasswordField passwordField = new PasswordField();
+                passwordField.setPromptText("Password");
+
+                PasswordField confirmPasswordField = new PasswordField();
+                confirmPasswordField.setPromptText("Confirm Password");
+
+                GridPane loginGrid = new GridPane();
+                loginGrid.setHgap(10);
+                loginGrid.setVgap(10);
+                loginGrid.setPadding(new Insets(20));
+
+                loginGrid.add(new Label("Password:"), 0, 0);
+                loginGrid.add(passwordField, 1, 0);
+                loginGrid.add(new Label("Confirm Password:"), 0, 1);
+                loginGrid.add(confirmPasswordField, 1, 1);
+
+                passwordDialog.getDialogPane().setContent(loginGrid);
+
+                ButtonType signUpButtonType = new ButtonType("Sign Up", ButtonBar.ButtonData.OK_DONE);
+                passwordDialog.getDialogPane().getButtonTypes().addAll(signUpButtonType, ButtonType.CANCEL);
+
+                passwordDialog.setResultConverter(buttonType -> {
+                    if (buttonType == signUpButtonType) {
+                        String password = passwordField.getText();
+                        String confirmPassword = confirmPasswordField.getText();
+
+                        if (password.equals(confirmPassword)) {
+                            return password;
+                        } else {
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setTitle("Error");
+                            alert.setHeaderText("Passwords do not match");
+                            alert.setContentText("Please make sure both passwords are the same.");
+                            alert.show();
+                            return null;
+                        }
+                    }
+                    return null;
+                });
+
+                Optional<String> passwordResult = passwordDialog.showAndWait();
+                passwordResult.ifPresent(password -> {
+                    User newUser = new User(username, password, false);
+                    users.add(newUser);
+                    User.saveUsers(users, "users.csv");
+
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                    alert.setTitle("Sign Up Successful");
+                    alert.setHeaderText("Account created");
+                    alert.setContentText("You can now log in with your new account.");
+                    alert.show();
+                });
+            });
+        });
+
+        guestButton.setOnAction(e -> {
+            loginStage.close();
+            showMainUI(primaryStage);
+        });
+
+        Scene loginScene = new Scene(grid, 300, 200);
+        loginStage.setScene(loginScene);
+        loginStage.show();
+    }
+
+    public void showMainUI(Stage primaryStage) {
         File imagesDir = new File("/RestaurantCatalog/images/");
         if (!imagesDir.exists()) {
             imagesDir.mkdirs();
         }
 
-        primaryStage.setTitle("Restaurant Catalog");
         allRestaurants = getRestaurants("restaurants.csv");
+
+        primaryStage.setTitle("Restaurant Catalog");
 
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: #F8F9FA;");
@@ -102,10 +234,12 @@ public class RestaurantCatalogUI extends Application {
 
         topNav.getChildren().add(topNavContainer);
 
-        Button addButton = new Button("Add Restaurant");
-        addButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 8 16;");
-        addButton.setOnAction(e -> openAddRestaurantDialog());
-        topNav.getChildren().add(addButton);
+        if (isAdmin) {
+            Button addButton = new Button("Add Restaurant");
+            addButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 20; -fx-padding: 8 16;");
+            addButton.setOnAction(e -> openAddRestaurantDialog());
+            topNav.getChildren().add(addButton);
+        }
 
         return topNav;
     }
@@ -505,30 +639,34 @@ public class RestaurantCatalogUI extends Application {
             alert.showAndWait();
         });
 
-        Button updateButton = new Button("Update Details");
-        updateButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 5;");
-        updateButton.setMinWidth(120);
-        updateButton.setPadding(new Insets(6, 14, 6, 14));
-        updateButton.setOnAction(e -> openUpdateRestaurantDialog(restaurant));
+        if (isAdmin) {
+            Button updateButton = new Button("Update Details");
+            updateButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 5;");
+            updateButton.setMinWidth(120);
+            updateButton.setPadding(new Insets(6, 14, 6, 14));
+            updateButton.setOnAction(e -> openUpdateRestaurantDialog(restaurant));
 
-        Button deleteButton = new Button("Delete");
-        deleteButton.setStyle("-fx-background-color: #FF0000; -fx-text-fill: white; -fx-background-radius: 5;");
-        deleteButton.setMinWidth(100);
-        deleteButton.setPadding(new Insets(6, 12, 6, 12));
-        deleteButton.setOnAction(e -> {
-            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-            alert.setTitle("Delete Restaurant");
-            alert.setHeaderText("Are you sure you want to delete " + restaurant.name + "?");
-            alert.setContentText("This action cannot be undone.");
+            Button deleteButton = new Button("Delete");
+            deleteButton.setStyle("-fx-background-color: #FF0000; -fx-text-fill: white; -fx-background-radius: 5;");
+            deleteButton.setMinWidth(100);
+            deleteButton.setPadding(new Insets(6, 12, 6, 12));
+            deleteButton.setOnAction(e -> {
+                Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                alert.setTitle("Delete Restaurant");
+                alert.setHeaderText("Are you sure you want to delete " + restaurant.name + "?");
+                alert.setContentText("This action cannot be undone.");
 
-            alert.showAndWait().ifPresent(response -> {
-                if (response == ButtonType.OK) {
-                    deleteRestaurant(restaurant);
-                }
+                alert.showAndWait().ifPresent(response -> {
+                    if (response == ButtonType.OK) {
+                        deleteRestaurant(restaurant);
+                    }
+                });
             });
-        });
 
-        buttonBox.getChildren().addAll(orderButton, detailsButton, updateButton, deleteButton);
+            buttonBox.getChildren().addAll(orderButton, detailsButton, updateButton, deleteButton);
+        } else {
+            buttonBox.getChildren().addAll(orderButton, detailsButton);
+        }
 
         infoBox.getChildren().addAll(headerBox, cuisineRatingBox, buttonBox);
         card.getChildren().addAll(imageView, infoBox);
@@ -698,6 +836,53 @@ public class RestaurantCatalogUI extends Application {
             }
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    static class User {
+        private String username, password;
+        private boolean isAdmin;
+
+        public User(String username, String password, boolean isAdmin) {
+            this.username = username;
+            this.password = password;
+            this.isAdmin = isAdmin;
+        }
+
+        public String getUsername() { return username; }
+        public String getPassword() { return password; }
+        public boolean isAdmin() { return isAdmin; }
+
+        public String toCSV() { return username + "," + password + "," + isAdmin; }
+
+        public static List<User> loadUsers(String filePath) {
+            List<User> users = new ArrayList<>();
+            try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    String[] data = line.split(",");
+                    if (data.length == 3) {
+                        String username = data[0].trim();
+                        String password = data[1].trim();
+                        boolean isAdmin = Boolean.parseBoolean(data[2].trim());
+                        users.add(new User(username, password, isAdmin));
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return users;
+        }
+
+        public static void saveUsers(List<User> users, String filePath) {
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(filePath))) {
+                for (User user : users) {
+                    bw.write(user.toCSV());
+                    bw.newLine();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
