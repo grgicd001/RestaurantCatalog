@@ -37,13 +37,14 @@ public class RestaurantCatalogUI extends Application {
         }
     }
 
+    private List<User> users = User.loadUsers("users.csv");;
+    private User currentUser;
     private boolean isAdmin;
     public GridPane gridPane;
     public List<Restaurant> allRestaurants;
 
     @Override
     public void start(Stage primaryStage) {
-        List<User> users = User.loadUsers("users.csv");
 
         Stage loginStage = new Stage();
         loginStage.setTitle("Login");
@@ -76,15 +77,16 @@ public class RestaurantCatalogUI extends Application {
             boolean isValid = false;
             for (User user : users) {
                 if (user.getUsername().equals(username) && user.getPassword().equals(password)) {
+                    currentUser = user; // Set the current user
+                    isAdmin = user.isAdmin(); // Set admin status
                     isValid = true;
-                    isAdmin = user.isAdmin();
                     break;
                 }
             }
 
             if (isValid) {
                 loginStage.close();
-                showMainUI(primaryStage);
+                showMainUI(primaryStage); // Proceed to the main UI
             } else {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("Login Failed");
@@ -162,6 +164,8 @@ public class RestaurantCatalogUI extends Application {
         });
 
         guestButton.setOnAction(e -> {
+            currentUser = null; // No user is logged in (guest)
+            isAdmin = false; // Guests are not admins
             loginStage.close();
             showMainUI(primaryStage);
         });
@@ -416,8 +420,13 @@ public class RestaurantCatalogUI extends Application {
         allButton.setMaxWidth(Double.MAX_VALUE);
         allButton.setStyle(activeButtonStyle);
 
+        Button favoritesButton = new Button("Favorites");
+        favoritesButton.setMaxWidth(Double.MAX_VALUE);
+        favoritesButton.setStyle(buttonStyle);
+
         List<Button> categoryButtons = new ArrayList<>();
         categoryButtons.add(allButton);
+        categoryButtons.add(favoritesButton);
 
         Button fastFoodButton = new Button("Fast Food");
         Button italianButton = new Button("Italian");
@@ -438,7 +447,7 @@ public class RestaurantCatalogUI extends Application {
         categoryButtons.add(healthyButton);
 
         for (Button button : categoryButtons) {
-            if (button != allButton) {
+            if (button != allButton && button != favoritesButton) {
                 button.setMaxWidth(Double.MAX_VALUE);
                 button.setStyle(buttonStyle);
             }
@@ -451,14 +460,26 @@ public class RestaurantCatalogUI extends Application {
 
                 if (button == allButton) {
                     displayAllRestaurants();
+                } else if (button == favoritesButton) {
+                    displayFavorites();
                 } else {
                     filterRestaurantsByCategory(button.getText());
                 }
             });
         }
 
+        VBox buttonContainer = new VBox(10);
+        buttonContainer.getChildren().addAll(categoryButtons);
+
+        ScrollPane scrollPane = new ScrollPane(buttonContainer);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scrollPane.setStyle("-fx-background-color: transparent;");
+
         leftSidebar.getChildren().add(categoriesLabel);
-        leftSidebar.getChildren().addAll(categoryButtons);
+        leftSidebar.getChildren().add(scrollPane);
+
         return leftSidebar;
     }
 
@@ -610,41 +631,65 @@ public class RestaurantCatalogUI extends Application {
         cuisineRatingBox.getChildren().addAll(cuisineLabel, ratingBox);
         cuisineRatingBox.setSpacing(10);
 
-        HBox buttonBox = new HBox(5);
-        buttonBox.setAlignment(Pos.CENTER_LEFT);
+        // Button Grid
+        GridPane buttonGrid = new GridPane();
+        buttonGrid.setHgap(10);
+        buttonGrid.setVgap(10);
+        buttonGrid.setPadding(new Insets(10, 0, 0, 0));
 
+        // Order Button
         Button orderButton = new Button("Order Now");
         orderButton.setStyle("-fx-background-color: #28A745; -fx-text-fill: white; -fx-background-radius: 5;");
         orderButton.setMinWidth(100);
         orderButton.setPadding(new Insets(6, 12, 6, 12));
+        buttonGrid.add(orderButton, 0, 0);
 
+        // Details Button
         Button detailsButton = new Button("View Details");
         detailsButton.setStyle("-fx-background-color: transparent; -fx-text-fill: #6C757D; -fx-border-color: #6C757D; -fx-border-radius: 5;");
         detailsButton.setMinWidth(100);
         detailsButton.setPadding(new Insets(6, 12, 6, 12));
+        buttonGrid.add(detailsButton, 1, 0);
 
-        detailsButton.setOnAction(e -> {
-            Alert alert = new Alert(Alert.AlertType.NONE);
-            alert.setTitle("Restaurant Details");
-            alert.setHeaderText(restaurant.name);
-            alert.setContentText("Cuisine: " + restaurant.cuisine + "\nRating: " + restaurant.rating + "/5.0" +
-                    "\n\nThis restaurant offers delicious " + restaurant.cuisine.toLowerCase() +
-                    " cuisine with exceptional service and ambiance.");
+        // Favorite Button
+        Button favoriteButton = new Button("Add to Favorites");
+        favoriteButton.setStyle("-fx-background-color: transparent; -fx-text-fill: #FF0000; -fx-border-color: #FF0000; -fx-border-radius: 5;");
+        favoriteButton.setMinWidth(120);
+        favoriteButton.setPadding(new Insets(6, 12, 6, 12));
 
-            ButtonType okButtonType = new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
-            ButtonType updateButtonType = new ButtonType("Update Details");
+        // Check if the restaurant is already a favorite
+        if (currentUser != null && currentUser.getFavoriteRestaurants().contains(restaurant.name)) {
+            favoriteButton.setText("Remove from Favorites");
+        }
 
-            alert.getButtonTypes().setAll(okButtonType);
-
-            alert.showAndWait();
+        favoriteButton.setOnAction(e -> {
+            if (currentUser != null) {
+                if (currentUser.getFavoriteRestaurants().contains(restaurant.name)) {
+                    currentUser.removeFavoriteRestaurant(restaurant.name);
+                    favoriteButton.setText("Add to Favorites");
+                } else {
+                    currentUser.addFavoriteRestaurant(restaurant.name);
+                    favoriteButton.setText("Remove from Favorites");
+                }
+                User.saveUsers(users, "users.csv"); // Save updated user data
+            } else {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("Not Logged In");
+                alert.setHeaderText("You must be logged in to add favorites.");
+                alert.setContentText("Please log in or sign up to use this feature.");
+                alert.show();
+            }
         });
+        buttonGrid.add(favoriteButton, 0, 1);
 
+        // Admin Buttons (if applicable)
         if (isAdmin) {
             Button updateButton = new Button("Update Details");
             updateButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white; -fx-background-radius: 5;");
             updateButton.setMinWidth(120);
             updateButton.setPadding(new Insets(6, 14, 6, 14));
             updateButton.setOnAction(e -> openUpdateRestaurantDialog(restaurant));
+            buttonGrid.add(updateButton, 1, 1);
 
             Button deleteButton = new Button("Delete");
             deleteButton.setStyle("-fx-background-color: #FF0000; -fx-text-fill: white; -fx-background-radius: 5;");
@@ -662,13 +707,10 @@ public class RestaurantCatalogUI extends Application {
                     }
                 });
             });
-
-            buttonBox.getChildren().addAll(orderButton, detailsButton, updateButton, deleteButton);
-        } else {
-            buttonBox.getChildren().addAll(orderButton, detailsButton);
+            buttonGrid.add(deleteButton, 2, 1);
         }
 
-        infoBox.getChildren().addAll(headerBox, cuisineRatingBox, buttonBox);
+        infoBox.getChildren().addAll(headerBox, cuisineRatingBox, buttonGrid);
         card.getChildren().addAll(imageView, infoBox);
         return card;
     }
@@ -839,33 +881,79 @@ public class RestaurantCatalogUI extends Application {
         }
     }
 
+    public void displayFavorites() {
+        List<Restaurant> favorites = new ArrayList<>();
+        for (String restaurantName : currentUser.getFavoriteRestaurants()) {
+            for (Restaurant restaurant : allRestaurants) {
+                if (restaurant.name.equals(restaurantName)) {
+                    favorites.add(restaurant);
+                    break;
+                }
+            }
+        }
+        displayRestaurants(favorites);
+    }
+
     static class User {
         private String username, password;
         private boolean isAdmin;
+        private List<String> favoriteRestaurants;
 
         public User(String username, String password, boolean isAdmin) {
             this.username = username;
             this.password = password;
             this.isAdmin = isAdmin;
+            this.favoriteRestaurants = new ArrayList<>();
         }
 
         public String getUsername() { return username; }
         public String getPassword() { return password; }
         public boolean isAdmin() { return isAdmin; }
+        public List<String> getFavoriteRestaurants() { return favoriteRestaurants; }
 
-        public String toCSV() { return username + "," + password + "," + isAdmin; }
+        public void addFavoriteRestaurant(String restaurantName) {
+            if (!favoriteRestaurants.contains(restaurantName)) {
+                favoriteRestaurants.add(restaurantName);
+            }
+        }
+
+        public void removeFavoriteRestaurant(String restaurantName) {
+            favoriteRestaurants.remove(restaurantName);
+        }
+
+        public String toCSV() {
+            String favorites = String.join("|", favoriteRestaurants); // Use pipe as delimiter
+            return username + "," + password + "," + isAdmin + "," + favorites;
+        }
+
+        public static User fromCSV(String csvLine) {
+            String[] data = csvLine.split(",");
+            if (data.length >= 3) {
+                String username = data[0].trim();
+                String password = data[1].trim();
+                boolean isAdmin = Boolean.parseBoolean(data[2].trim());
+                User user = new User(username, password, isAdmin);
+
+                if (data.length >= 4) {
+                    String favorites = data[3].trim();
+                    if (!favorites.isEmpty()) {
+                        user.favoriteRestaurants.addAll(List.of(favorites.split("\\|")));
+                    }
+                }
+
+                return user;
+            }
+            return null;
+        }
 
         public static List<User> loadUsers(String filePath) {
             List<User> users = new ArrayList<>();
             try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
                 String line;
                 while ((line = br.readLine()) != null) {
-                    String[] data = line.split(",");
-                    if (data.length == 3) {
-                        String username = data[0].trim();
-                        String password = data[1].trim();
-                        boolean isAdmin = Boolean.parseBoolean(data[2].trim());
-                        users.add(new User(username, password, isAdmin));
+                    User user = User.fromCSV(line);
+                    if (user != null) {
+                        users.add(user);
                     }
                 }
             } catch (IOException e) {
@@ -874,6 +962,7 @@ public class RestaurantCatalogUI extends Application {
             return users;
         }
 
+        // Save users to CSV file
         public static void saveUsers(List<User> users, String filePath) {
             try (BufferedWriter bw = new BufferedWriter(new FileWriter(filePath))) {
                 for (User user : users) {
