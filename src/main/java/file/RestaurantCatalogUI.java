@@ -44,7 +44,7 @@ public class RestaurantCatalogUI extends Application {
     public List<Restaurant> allRestaurants;
 
     public void handleSignUp(String username, String password) {
-        // Validate password (you can reuse the isValidPassword method)
+        // Validate password
         if (!isValidPassword(password)) {
             throw new IllegalArgumentException("Invalid password");
         }
@@ -62,7 +62,6 @@ public class RestaurantCatalogUI extends Application {
         User.saveUsers(users, "users.csv");
     }
 
-    // Add this helper method for password validation
     private boolean isValidPassword(String password) {
         // Example password validation rules:
         // - At least 8 characters

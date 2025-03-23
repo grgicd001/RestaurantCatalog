@@ -16,7 +16,7 @@ import java.util.stream.Stream;
 
 class RestaurantCatalogUITest {
     // =============================================
-    // Clear Box Tests (White Box - Internal knowledge)
+    // Clear Box Tests
     // =============================================
     @Nested
     @DisplayName("User Class Unit Tests")
@@ -86,7 +86,7 @@ class RestaurantCatalogUITest {
     }
 
     // =============================================
-    // Translucent Box Tests (Gray Box - Partial knowledge)
+    // Translucent Box Tests
     // =============================================
     @Nested
     @DisplayName("Authentication Integration Tests")
@@ -159,7 +159,7 @@ class RestaurantCatalogUITest {
     }
 
     // =============================================
-    // Opaque Box Tests (Black Box - External perspective)
+    // Opaque Box Tests 
     // =============================================
     @Nested
     @DisplayName("End-to-End System Tests")
