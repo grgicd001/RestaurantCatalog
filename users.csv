@@ -1,4 +1,5 @@
 vithurankanka,password123,true,
-dannyg,dannyg,true,Pizza Palace|Burger Bonanza|Sushi Central
-user,userpassword,false,Sushi Central
+dannyg,dannyg,true,Pizza Palace|Sushi Central
+user,userpassword,false,
 admin,adminpassword,true,
+newUser,newpassword,false,

@@ -37,11 +37,42 @@ public class RestaurantCatalogUI extends Application {
         }
     }
 
-    private List<User> users = User.loadUsers("users.csv");;
-    private User currentUser;
+    public List<User> users = User.loadUsers("users.csv");;
+    public User currentUser;
     private boolean isAdmin;
     public GridPane gridPane;
     public List<Restaurant> allRestaurants;
+
+    public void handleSignUp(String username, String password) {
+        // Validate password (you can reuse the isValidPassword method)
+        if (!isValidPassword(password)) {
+            throw new IllegalArgumentException("Invalid password");
+        }
+
+        // Check if the username already exists
+        for (User user : users) {
+            if (user.getUsername().equals(username)) {
+                throw new IllegalArgumentException("Username already exists");
+            }
+        }
+
+        // Create and save the new user
+        User newUser = new User(username, password, false);
+        users.add(newUser);
+        User.saveUsers(users, "users.csv");
+    }
+
+    // Add this helper method for password validation
+    private boolean isValidPassword(String password) {
+        // Example password validation rules:
+        // - At least 8 characters
+        // - Contains at least one uppercase letter
+        // - Contains at least one digit
+        return password != null &&
+                password.length() >= 8 &&
+                password.matches(".*[A-Z].*") &&
+                password.matches(".*\\d.*");
+    }
 
     @Override
     public void start(Stage primaryStage) {
@@ -715,7 +746,7 @@ public class RestaurantCatalogUI extends Application {
         return card;
     }
 
-    private static void addImage(File img, String id, boolean cover) {
+    public static void addImage(File img, String id, boolean cover) {
         InputStream is = null;
         OutputStream os = null;
 
