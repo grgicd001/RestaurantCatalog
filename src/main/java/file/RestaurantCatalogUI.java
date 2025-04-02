@@ -21,7 +21,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+
 public class RestaurantCatalogUI extends Application {
+
+    public static void main(String[] args) {
+        launch(args);
+    }
 
     public static class Restaurant {
         public String name;
@@ -975,7 +980,212 @@ public class RestaurantCatalogUI extends Application {
         }
     }
 
-    public static void main(String[] args) {
-        launch(args);
+   static class Review {
+        public String restaurantName;
+        public String username;
+        public String comment;
+        public double rating;
+        public String date;
+        private List<Review> allReviews;
+
+        public Review(String restaurantName, String username, String comment, double rating, String date) {
+            this.restaurantName = restaurantName;
+            this.username = username;
+            this.comment = comment;
+            this.rating = rating;
+            this.date = date;
+        }
+    }
+        public List<Review> loadReviews(String filePath) {
+            List<Review> reviews = new ArrayList<>();
+            try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    String[] data = line.split("\\|", 5);
+                    if (data.length == 5) {
+                        reviews.add(new Review(
+                                data[0].trim(),
+                                data[1].trim(),
+                                data[2].trim(),
+                                Double.parseDouble(data[3].trim()),
+                                data[4].trim()
+                        ));
+                    }
+                }
+            } catch (IOException e) {
+                try {
+                    new File(filePath).createNewFile();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            return reviews;
+        }
+        public void saveReviews(List<Review> reviews,String filePath) {
+            try(BufferedWriter bw = new BufferedWriter(new FileWriter(filePath))){
+                for (Review review : reviews) {
+                    bw.write(String.join("|",
+                       review.restaurantName,
+                       review.username,
+                       review.comment,
+                       String.valueOf(review.rating),
+                       review.date
+                    ));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    private void showReviewDialog(Restaurant restaurant,List<Review> allReview) {
+        // Create a new Stage for the dialog
+        Stage reviewDialog = new Stage();
+        reviewDialog.setTitle("Add Review for " + restaurant.name);
+
+        // Rating slider setup
+        Slider ratingSlider = new Slider(1, 5, 3);
+        ratingSlider.setShowTickLabels(true);
+        ratingSlider.setMajorTickUnit(1);
+        ratingSlider.setSnapToTicks(true);
+
+        Label ratingValue = new Label("3");
+        ratingSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            ratingValue.setText(String.format("%.0f", newVal));
+        });
+
+        // Review text area
+        TextArea reviewText = new TextArea();
+        reviewText.setPromptText("Share your experience...");
+        reviewText.setWrapText(true);
+
+        // Submit button
+        Button submitButton = new Button("Submit Review");
+        submitButton.setOnAction(e -> {
+            if (currentUser == null) {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("Not Logged In");
+                alert.setHeaderText("You must be logged in to submit reviews.");
+                alert.show();
+                return;
+            }
+
+            String comment = reviewText.getText().trim();
+            if (comment.isEmpty()) {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("Empty Review");
+                alert.setHeaderText("Please write something in your review.");
+                alert.show();
+                return;
+            }
+
+            Review newReview = new Review(
+                    restaurant.name,
+                    currentUser.getUsername(),
+                    comment,
+                    ratingSlider.getValue(),
+                    java.time.LocalDate.now().toString()
+            );
+
+            allReview.add(newReview);
+            saveReviews(allReview, "reviews.csv");
+            updateRestaurantRating(restaurant.name);
+
+            Alert success = new Alert(Alert.AlertType.INFORMATION);
+            success.setTitle("Review Submitted");
+            success.setHeaderText("Thank you for your review!");
+            success.show();
+
+            reviewDialog.close();
+        });
+
+        VBox layout = new VBox(10,
+                new HBox(10, new Label("Rating:"), ratingSlider, ratingValue),
+                new Label("Your Review:"),
+                reviewText,
+                submitButton
+        );
+        layout.setPadding(new Insets(15));
+
+        reviewDialog.setScene(new Scene(layout, 400, 300));
+        reviewDialog.show();
+    }
+        private void updateRestaurantRating(String restaurantName) {
+            List<Review> reviews = loadReviews("reviews.csv");
+            double sum = 0;
+            int count = 0;
+
+            for (Review review : reviews) {
+                if(review.restaurantName.equals(restaurantName)){
+                    sum += review.rating;
+                    count++;
+                }
+            }
+
+            if(count > 0){
+                double newRating = sum / count;
+                for(Restaurant restaurant : allRestaurants){
+                    if(restaurant.name.equals(restaurantName)){
+                        restaurant.rating = newRating;
+                        break;
+                    }
+                }
+                saveRestaurants("restaurants.csv");
+                displayAllRestaurants();
+            }
+        }
+    private void showRestaurantReviews(Restaurant restaurant) {
+        Stage reviewsDialog = new Stage();
+        reviewsDialog.setTitle("Reviews for " + restaurant.name);
+
+        List<Review> reviews = loadReviews("reviews.csv");
+        List<Review> filteredReviews = reviews.stream()
+                .filter(r -> r.restaurantName.equals(restaurant.name))
+                .toList();
+
+        VBox reviewsContainer = new VBox(10);
+        reviewsContainer.setPadding(new Insets(15));
+
+        if(filteredReviews.isEmpty()) {
+            Label noReviews = new Label("No reviews yet for this restaurant.");
+            reviewsContainer.getChildren().add(noReviews);
+        } else {
+            for (Review review : filteredReviews) {
+                VBox reviewBox = new VBox(5);
+                reviewBox.setStyle("-fx-background-color: #F8F9FA; -fx-padding: 10; -fx-border-radius: 5;");
+
+                HBox header = new HBox(10);
+                Label userLabel = new Label(review.username);
+                userLabel.setStyle("-fx-font-weight: bold;");
+
+                Label ratingLabel = new Label("★ " + String.format("%.1f", review.rating));
+                ratingLabel.setStyle("-fx-text-fill: #FFC107; -fx-font-weight: bold;");
+
+                Label dateLabel = new Label(review.date);
+                dateLabel.setStyle("-fx-text-fill: #6C757D; -fx-font-size: 12;");
+
+                header.getChildren().addAll(userLabel, ratingLabel, dateLabel);
+                Label commentLabel = new Label(review.comment);
+                commentLabel.setWrapText(true);
+
+                reviewBox.getChildren().addAll(header, commentLabel);
+                reviewsContainer.getChildren().add(reviewBox);
+            }
+        }
+
+        ScrollPane scrollPane = new ScrollPane(reviewsContainer);
+        scrollPane.setFitToWidth(true);
+
+        Button addReviewButton = new Button("Add Review");
+        addReviewButton.setStyle("-fx-background-color: #007BFF; -fx-text-fill: white;");
+        addReviewButton.setOnAction(e -> {
+            reviewsDialog.close();
+
+        });
+
+        VBox layout = new VBox(10);
+        layout.setPadding(new Insets(15));
+        layout.getChildren().addAll(scrollPane, addReviewButton);
+
+        reviewsDialog.setScene(new Scene(layout, 500, 400));
+        reviewsDialog.show();
     }
 }
