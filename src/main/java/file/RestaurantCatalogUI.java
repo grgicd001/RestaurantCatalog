@@ -1408,6 +1408,13 @@ public class RestaurantCatalogUI extends Application {
                 String extraImgsJoined = String.join(";", r.additionalImages);
                 String menuJoined = String.join(";", r.menuItems);
 
+                // Serialize operating hours
+                List<String> hoursEntries = new ArrayList<>();
+                for (Map.Entry<String, String> entry : r.operatingHours.entrySet()) {
+                    hoursEntries.add(entry.getKey() + "=" + entry.getValue());
+                }
+                String hoursJoined = String.join(";", hoursEntries);
+
                 String line = String.join("|",
                         r.name,
                         r.cuisine,
@@ -1416,7 +1423,10 @@ public class RestaurantCatalogUI extends Application {
                         r.description,
                         tagsJoined,
                         extraImgsJoined,
-                        menuJoined);
+                        menuJoined,
+                        r.location,  // Add location
+                        hoursJoined  // Add operating hours
+                );
                 bw.write(line);
                 bw.newLine();
             }
