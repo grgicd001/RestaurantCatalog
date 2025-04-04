@@ -17,9 +17,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import javafx.scene.Node;
 
@@ -34,9 +32,12 @@ public class RestaurantCatalogUI extends Application {
         public List<String> tags;
         public List<String> additionalImages;
         public List<String> menuItems;
+        public String location;
+        public Map<String, String> operatingHours; // Key: Day, Value: Hours string
 
         public Restaurant(String name, String cuisine, String imageUrl, double rating, String description,
-                          List<String> tags, List<String> additionalImages, List<String> menuItems) {
+                          List<String> tags, List<String> additionalImages, List<String> menuItems,
+                          String location, Map<String, String> operatingHours) {
             this.name = name;
             this.cuisine = cuisine;
             this.imageUrl = imageUrl;
@@ -45,10 +46,25 @@ public class RestaurantCatalogUI extends Application {
             this.tags = tags;
             this.additionalImages = additionalImages;
             this.menuItems = menuItems;
+            this.location = location;
+            this.operatingHours = operatingHours;
         }
 
         public Restaurant(String name, String cuisine, String imageUrl, double rating) {
-            this(name, cuisine, imageUrl, rating, "", new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+            this(name, cuisine, imageUrl, rating, "", new ArrayList<>(), new ArrayList<>(), new ArrayList<>(),
+                    "", createDefaultOperatingHours());
+        }
+
+        private static Map<String, String> createDefaultOperatingHours() {
+            Map<String, String> hours = new LinkedHashMap<>();
+            hours.put("Sunday", "Closed");
+            hours.put("Monday", "11:00 a.m. - 10:00 p.m.");
+            hours.put("Tuesday", "11:00 a.m. - 10:00 p.m.");
+            hours.put("Wednesday", "11:00 a.m. - 10:00 p.m.");
+            hours.put("Thursday", "11:00 a.m. - 10:00 p.m.");
+            hours.put("Friday", "11:00 a.m. - 11:00 p.m.");
+            hours.put("Saturday", "11:00 a.m. - 11:00 p.m.");
+            return hours;
         }
     }
 
@@ -826,6 +842,33 @@ public class RestaurantCatalogUI extends Application {
         Label title = new Label(restaurant.name);
         title.setFont(Font.font("Montserrat", FontWeight.BOLD, 28));
 
+        // Location
+        Label locationTitle = new Label("Location:");
+        locationTitle.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+        Label locationLabel = new Label(restaurant.location);
+        locationLabel.setWrapText(true);
+
+        // Operating Hours
+        Label hoursTitle = new Label("Operating Hours:");
+        hoursTitle.setFont(Font.font("Arial", FontWeight.BOLD, 16));
+
+        GridPane hoursGrid = new GridPane();
+        hoursGrid.setHgap(20);
+        hoursGrid.setVgap(5);
+        hoursGrid.setPadding(new Insets(5));
+
+        int row = 0;
+        for (Map.Entry<String, String> entry : restaurant.operatingHours.entrySet()) {
+            Label dayLabel = new Label(entry.getKey() + ":");
+            dayLabel.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+            hoursGrid.add(dayLabel, 0, row);
+
+            Label hoursLabel = new Label(entry.getValue());
+            hoursLabel.setFont(Font.font("Arial", 14));
+            hoursGrid.add(hoursLabel, 1, row);
+            row++;
+        }
+
         ImageView mainImage = new ImageView();
         mainImage.setFitWidth(500);
         mainImage.setPreserveRatio(true);
@@ -909,6 +952,10 @@ public class RestaurantCatalogUI extends Application {
                 title,
                 mainImage,
                 ratingLabel,
+                locationTitle,
+                locationLabel,
+                hoursTitle,
+                hoursGrid,
                 descTitle,
                 descArea,
                 tagsLabel,
@@ -943,6 +990,16 @@ public class RestaurantCatalogUI extends Application {
 
         TextField tagsField = new TextField();
         tagsField.setPromptText("Tags (comma-separated)");
+
+        // Add location field
+        TextField locationField = new TextField();
+        locationField.setPromptText("Address (e.g., 550 Wellington St W, Toronto)");
+
+        // Add operating hours fields
+        Label hoursLabel = new Label("Operating Hours (one per line, format: Day=Hours)");
+        TextArea hoursArea = new TextArea();
+        hoursArea.setPromptText("Example:\nSunday=Closed\nMonday=11:00 a.m. - 10:00 p.m.\nTuesday=11:00 a.m. - 10:00 p.m.");
+        hoursArea.setPrefRowCount(7);
 
         Button uploadExtraImgs = new Button("Upload Extra Images");
         Label extraImgsLabel = new Label("None selected");
@@ -1027,7 +1084,26 @@ public class RestaurantCatalogUI extends Application {
                 }
             }
 
-            addRestaurant(name, cuisine, imageUrl, ratingValue, description, tags, extraImgPaths, menuItems);
+            // Parse operating hours
+            Map<String, String> operatingHours = new LinkedHashMap<>();
+            String[] hoursLines = hoursArea.getText().split("\n");
+            for (String line : hoursLines) {
+                if (!line.trim().isEmpty()) {
+                    String[] parts = line.split("=", 2);
+                    if (parts.length == 2) {
+                        operatingHours.put(parts[0].trim(), parts[1].trim());
+                    }
+                }
+            }
+
+            // Fill in any missing days with default values
+            String[] days = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+            for (String day : days) {
+                operatingHours.putIfAbsent(day, "Closed");
+            }
+
+            addRestaurant(name, cuisine, imageUrl, ratingValue, description, tags, extraImgPaths, menuItems,
+                    locationField.getText(), operatingHours);
             dialog.close();
         });
 
@@ -1035,6 +1111,9 @@ public class RestaurantCatalogUI extends Application {
                 nameField,
                 cuisineField,
                 ratingField,
+                locationField,
+                hoursLabel,
+                hoursArea,
                 descField,
                 tagsField,
                 uploadExtraImgs,
@@ -1061,6 +1140,20 @@ public class RestaurantCatalogUI extends Application {
         descField.setPrefRowCount(2);
 
         TextField tagsField = new TextField(String.join(",", restaurant.tags));
+
+        // Add location field
+        TextField locationField = new TextField(restaurant.location);
+        locationField.setPromptText("Address (e.g., 550 Wellington St W, Toronto)");
+
+        // Add operating hours fields
+        Label hoursLabel = new Label("Operating Hours (one per line, format: Day=Hours)");
+        TextArea hoursArea = new TextArea();
+        StringBuilder hoursText = new StringBuilder();
+        for (Map.Entry<String, String> entry : restaurant.operatingHours.entrySet()) {
+            hoursText.append(entry.getKey()).append("=").append(entry.getValue()).append("\n");
+        }
+        hoursArea.setText(hoursText.toString());
+        hoursArea.setPrefRowCount(7);
 
         Button uploadExtraImgs = new Button("Upload Extra Images");
         Label extraImgsLabel = new Label("No images selected (will keep existing if none chosen)");
@@ -1149,8 +1242,26 @@ public class RestaurantCatalogUI extends Application {
                 newCover = "images/" + id;
             }
 
+            // Parse operating hours
+            Map<String, String> operatingHours = new LinkedHashMap<>();
+            String[] hoursLines = hoursArea.getText().split("\n");
+            for (String line : hoursLines) {
+                if (!line.trim().isEmpty()) {
+                    String[] parts = line.split("=", 2);
+                    if (parts.length == 2) {
+                        operatingHours.put(parts[0].trim(), parts[1].trim());
+                    }
+                }
+            }
+
+            // Fill in any missing days with default values
+            String[] days = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+            for (String day : days) {
+                operatingHours.putIfAbsent(day, "Closed");
+            }
+
             updateRestaurant(restaurant, newName, newCuisine, newCover, newRating, newDesc, newTags, newExtraImgs,
-                    newMenu);
+                    newMenu, locationField.getText(), operatingHours);
             dialog.close();
         });
 
@@ -1158,6 +1269,9 @@ public class RestaurantCatalogUI extends Application {
                 nameField,
                 cuisineField,
                 ratingField,
+                locationField,
+                hoursLabel,
+                hoursArea,
                 descField,
                 tagsField,
                 uploadExtraImgs,
@@ -1173,19 +1287,19 @@ public class RestaurantCatalogUI extends Application {
     }
 
     public void addRestaurant(String name, String cuisine, String imageUrl, double rating, String description,
-                              List<String> tags, List<String> extraImgs, List<String> menuItems) {
-        Restaurant r = new Restaurant(name, cuisine, imageUrl, rating, description, tags, extraImgs, menuItems);
+                              List<String> tags, List<String> extraImgs, List<String> menuItems,
+                              String location, Map<String, String> operatingHours) {
+        Restaurant r = new Restaurant(name, cuisine, imageUrl, rating, description, tags, extraImgs, menuItems,
+                location, operatingHours);
         allRestaurants.add(r);
         displayAllRestaurants();
         saveRestaurants("restaurants.csv");
     }
 
-    public void addRestaurant(String name, String cuisine, String imageUrl, double rating) {
-        addRestaurant(name, cuisine, imageUrl, rating, "", new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
-    }
-
     public void updateRestaurant(Restaurant oldRes, String newName, String newCuisine, String newImageUrl,
-                                 double newRating, String newDesc, List<String> newTags, List<String> newExtraImgs, List<String> newMenu) {
+                                 double newRating, String newDesc, List<String> newTags,
+                                 List<String> newExtraImgs, List<String> newMenu,
+                                 String newLocation, Map<String, String> newOperatingHours) {
         oldRes.name = newName;
         oldRes.cuisine = newCuisine;
         oldRes.imageUrl = newImageUrl;
@@ -1194,6 +1308,8 @@ public class RestaurantCatalogUI extends Application {
         oldRes.tags = newTags;
         oldRes.additionalImages = newExtraImgs;
         oldRes.menuItems = newMenu;
+        oldRes.location = newLocation;
+        oldRes.operatingHours = newOperatingHours;
 
         displayAllRestaurants();
         saveRestaurants("restaurants.csv");
@@ -1211,66 +1327,73 @@ public class RestaurantCatalogUI extends Application {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] data = line.split("\\|");
-                if (data.length >= 8) {
-                    String name = data[0].trim();
-                    String cuisine = data[1].trim();
-                    String imageUrl = data[2].trim();
-                    double rating = Double.parseDouble(data[3].trim());
-                    String description = data[4].trim();
 
-                    List<String> tags = new ArrayList<>();
-                    if (!data[5].trim().isEmpty()) {
-                        for (String t : data[5].split(";")) {
-                            tags.add(t.trim());
-                        }
-                    }
+                // Common fields for all formats
+                String name = data[0].trim();
+                String cuisine = data[1].trim();
+                String imageUrl = data[2].trim();
+                double rating = Double.parseDouble(data[3].trim());
 
-                    List<String> extraImgs = new ArrayList<>();
-                    if (!data[6].trim().isEmpty()) {
-                        for (String img : data[6].split(";")) {
-                            extraImgs.add(img.trim());
-                        }
-                    }
+                // Initialize optional fields with defaults
+                String description = "";
+                List<String> tags = new ArrayList<>();
+                List<String> extraImgs = new ArrayList<>();
+                List<String> menuItems = new ArrayList<>();
+                String location = "";
+                Map<String, String> operatingHours = Restaurant.createDefaultOperatingHours();
 
-                    List<String> menuItems = new ArrayList<>();
-                    if (!data[7].trim().isEmpty()) {
-                        for (String m : data[7].split(";")) {
-                            menuItems.add(m.trim());
-                        }
-                    }
-
-                    restaurants.add(
-                            new Restaurant(name, cuisine, imageUrl, rating, description, tags, extraImgs, menuItems));
-                } else if (data.length == 7) {
-                    String name = data[0].trim();
-                    String cuisine = data[1].trim();
-                    String imageUrl = data[2].trim();
-                    double rating = Double.parseDouble(data[3].trim());
-                    String description = data[4].trim();
-
-                    List<String> tags = new ArrayList<>();
-                    if (!data[5].trim().isEmpty()) {
-                        for (String t : data[5].split(";")) {
-                            tags.add(t.trim());
-                        }
-                    }
-
-                    List<String> extraImgs = new ArrayList<>();
-                    if (!data[6].trim().isEmpty()) {
-                        for (String img : data[6].split(";")) {
-                            extraImgs.add(img.trim());
-                        }
-                    }
-
-                    restaurants.add(new Restaurant(name, cuisine, imageUrl, rating, description, tags, extraImgs,
-                            new ArrayList<>()));
-                } else if (data.length == 4) {
-                    String name = data[0].trim();
-                    String cuisine = data[1].trim();
-                    String imageUrl = data[2].trim();
-                    double rating = Double.parseDouble(data[3].trim());
-                    restaurants.add(new Restaurant(name, cuisine, imageUrl, rating));
+                // Handle description if present (formats with >= 5 fields)
+                if (data.length >= 5) {
+                    description = data[4].trim();
                 }
+
+                // Handle tags if present (formats with >= 6 fields)
+                if (data.length >= 6 && !data[5].trim().isEmpty()) {
+                    for (String t : data[5].split(";")) {
+                        tags.add(t.trim());
+                    }
+                }
+
+                // Handle extra images if present (formats with >= 7 fields)
+                if (data.length >= 7 && !data[6].trim().isEmpty()) {
+                    for (String img : data[6].split(";")) {
+                        extraImgs.add(img.trim());
+                    }
+                }
+
+                // Handle menu items if present (formats with >= 8 fields)
+                if (data.length >= 8 && !data[7].trim().isEmpty()) {
+                    for (String m : data[7].split(";")) {
+                        menuItems.add(m.trim());
+                    }
+                }
+
+                // Handle location if present (formats with >= 9 fields)
+                if (data.length >= 9) {
+                    location = data[8].trim();
+                }
+
+                // Handle operating hours if present (formats with >= 10 fields)
+                if (data.length >= 10 && !data[9].trim().isEmpty()) {
+                    operatingHours.clear();
+                    for (String entry : data[9].split(";")) {
+                        String[] parts = entry.split("=", 2);
+                        if (parts.length == 2) {
+                            operatingHours.put(parts[0].trim(), parts[1].trim());
+                        }
+                    }
+
+                    // Ensure all days are present
+                    String[] days = {"Sunday", "Monday", "Tuesday", "Wednesday",
+                            "Thursday", "Friday", "Saturday"};
+                    for (String day : days) {
+                        operatingHours.putIfAbsent(day, "Closed");
+                    }
+                }
+
+                // Create the restaurant with all available data
+                restaurants.add(new Restaurant(name, cuisine, imageUrl, rating,
+                        description, tags, extraImgs, menuItems, location, operatingHours));
             }
         } catch (IOException e) {
             e.printStackTrace();
