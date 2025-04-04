@@ -24,6 +24,19 @@ import java.nio.file.Path;
 class RestaurantCatalogUITest {
     private RestaurantCatalogUI app;
 
+    // Helper method to create standard operating hours
+    private Map<String, String> createStandardOperatingHours() {
+        Map<String, String> hours = new LinkedHashMap<>();
+        hours.put("Monday", "9AM-10PM");
+        hours.put("Tuesday", "9AM-10PM");
+        hours.put("Wednesday", "9AM-10PM");
+        hours.put("Thursday", "9AM-10PM");
+        hours.put("Friday", "9AM-11PM");
+        hours.put("Saturday", "10AM-11PM");
+        hours.put("Sunday", "10AM-9PM");
+        return hours;
+    }
+
     // =============================================
     // Clear Box Tests
     // =============================================
@@ -69,14 +82,21 @@ class RestaurantCatalogUITest {
         void addRestaurant_invalidRatings_throwsException() {
             RestaurantCatalogUI app = new RestaurantCatalogUI();
             app.allRestaurants = new ArrayList<>();
+            Map<String, String> hours = createStandardOperatingHours();
 
             assertAll(
                     () -> assertThrows(NumberFormatException.class,
-                            () -> app.addRestaurant("R1", "C1", "img", 0.5)),
+                            () -> app.addRestaurant("R1", "C1", "img", 0.5,
+                                    "Desc", new ArrayList<>(), new ArrayList<>(), new ArrayList<>(),
+                                    "123 Main St", hours)),
                     () -> assertThrows(NumberFormatException.class,
-                            () -> app.addRestaurant("R2", "C2", "img", 5.1)),
+                            () -> app.addRestaurant("R2", "C2", "img", 5.1,
+                                    "Desc", new ArrayList<>(), new ArrayList<>(), new ArrayList<>(),
+                                    "123 Main St", hours)),
                     () -> assertDoesNotThrow(
-                            () -> app.addRestaurant("R3", "C3", "img", 3.0))
+                            () -> app.addRestaurant("R3", "C3", "img", 3.0,
+                                    "Desc", new ArrayList<>(), new ArrayList<>(), new ArrayList<>(),
+                                    "123 Main St", hours))
             );
         }
 
@@ -211,7 +231,14 @@ class RestaurantCatalogUITest {
 
             // Phase 3: Simulate restaurant operations
             app.currentUser = newUser;
-            app.addRestaurant("Test Restaurant", "Italian", "img.jpg", 4.5);
+            Map<String, String> hours = createStandardOperatingHours();
+            app.addRestaurant("Test Restaurant", "Italian", "img.jpg", 4.5,
+                    "Test description",
+                    Arrays.asList("tag1", "tag2"),
+                    Arrays.asList("img1.jpg", "img2.jpg"),
+                    Arrays.asList("Pizza-15.99", "Pasta-16.99"),
+                    "123 Main St, Testville",
+                    hours);
             app.saveRestaurants(restaurantsFile.getAbsolutePath());
             assertEquals(1, app.getRestaurants(restaurantsFile.getAbsolutePath()).size());
 
