@@ -3,3 +3,4 @@ dannyg,dannyg,true,Pizza Palace|Sushi Central
 user,userpassword,false,
 admin,adminpassword,true,
 newUser,newpassword,false,
+newuser,ValidPass123!,false,
